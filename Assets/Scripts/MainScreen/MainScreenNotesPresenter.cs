@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 public class MainScreenNotesPresenter : MonoBehaviour
@@ -7,8 +8,6 @@ public class MainScreenNotesPresenter : MonoBehaviour
     [SerializeField] private CreateNote _createNoteScreen;
     [SerializeField] private MainScreenNotesView _notesView;
     [SerializeField] private List<FilledNoteInfo> _filledNoteDataWindows;
-    
-    private List<int> _availableWindowIndexes = new List<int>();
 
     public event Action<FilledNoteInfo> NoteInfoClicked;
 
@@ -36,28 +35,26 @@ public class MainScreenNotesPresenter : MonoBehaviour
         if(string.IsNullOrEmpty(data.Note) || string.IsNullOrEmpty(data.Date))
             return;
         
-        if (_availableWindowIndexes.Count > 0)
+        // Find the first inactive window
+        var currentFilleWindow = _filledNoteDataWindows.FirstOrDefault(window => !window.IsActive);
+        
+        if (currentFilleWindow != null)
         {
-            int availableIndex = _availableWindowIndexes[0];
-            _availableWindowIndexes.RemoveAt(0);
-
-            var currentFilleWindow = _filledNoteDataWindows[availableIndex];
-
-            if (!currentFilleWindow.IsActive)
-            {
-                currentFilleWindow.Enable();
-                currentFilleWindow.DeleteButtonClicked += ProcessFilledTravelsDataDeletion;
-                currentFilleWindow.OpenNoteInfoClicked += ProcessOpenNoteClicked;
-                currentFilleWindow.DataChanged += SaveNotes;
-                currentFilleWindow.SetNoteData(data);
-            }
+            currentFilleWindow.Enable();
+            currentFilleWindow.DeleteButtonClicked += ProcessFilledTravelsDataDeletion;
+            currentFilleWindow.OpenNoteInfoClicked += ProcessOpenNoteClicked;
+            currentFilleWindow.DataChanged += SaveNotes;
+            currentFilleWindow.SetNoteData(data);
          
-            if (_availableWindowIndexes.Count < _filledNoteDataWindows.Count)
+            // Check if we have at least one active window
+            if (_filledNoteDataWindows.Count(window => window.IsActive) > 0)
             {
                 _notesView.DisableEmptyHistoryWindow();
+                _notesView.UpdateNotesState(true);
             }
 
-            if (_availableWindowIndexes.Count == 0)
+            // Check if all windows are now filled
+            if (_filledNoteDataWindows.Count(window => !window.IsActive) == 0)
             {
                 _notesView.ToggleAddNoteButton(false);
             }
@@ -71,22 +68,17 @@ public class MainScreenNotesPresenter : MonoBehaviour
         if (window == null)
             throw new ArgumentNullException(nameof(window));
 
-        int windowIndex = _filledNoteDataWindows.IndexOf(window);
-      
-        if (windowIndex >= 0 && !_availableWindowIndexes.Contains(windowIndex))
-        {
-            _availableWindowIndexes.Add(windowIndex);
-        }
-      
         window.DeleteButtonClicked -= ProcessFilledTravelsDataDeletion;
         window.OpenNoteInfoClicked -= ProcessOpenNoteClicked;
         window.DataChanged -= SaveNotes;
         window.Disable();
         _notesView.ToggleAddNoteButton(true);
       
-        if (_availableWindowIndexes.Count >= _filledNoteDataWindows.Count)
+        // Check if all windows are now inactive
+        if (_filledNoteDataWindows.Count(w => w.IsActive) == 0)
         {
             _notesView.EnableEmptyHistoryWindow();
+            _notesView.UpdateNotesState(false);
         }
         
         SaveNotes();
@@ -94,26 +86,22 @@ public class MainScreenNotesPresenter : MonoBehaviour
     
     private void DisableAllFilledWindows()
     {
-        for (int i = 0; i < _filledNoteDataWindows.Count; i++)
+        foreach (var window in _filledNoteDataWindows)
         {
-            _filledNoteDataWindows[i].Disable();
-            _availableWindowIndexes.Add(i);
+            window.Disable();
         }
       
         _notesView.EnableEmptyHistoryWindow();
+        _notesView.UpdateNotesState(false);
     }
     
     private void SaveNotes()
     {
-        List<NoteData> noteDataList = new List<NoteData>();
-
-        foreach (var window in _filledNoteDataWindows)
-        {
-            if (window.IsActive)
-            {
-                noteDataList.Add(window.NoteData);
-            }
-        }
+        // Select only active windows' data
+        List<NoteData> noteDataList = _filledNoteDataWindows
+            .Where(window => window.IsActive)
+            .Select(window => window.NoteData)
+            .ToList();
 
         string json = JsonUtility.ToJson(new NoteDataListWrapper(noteDataList), true);
         string path = System.IO.Path.Combine(Application.persistentDataPath, "notes.json");
@@ -129,9 +117,13 @@ public class MainScreenNotesPresenter : MonoBehaviour
             string json = System.IO.File.ReadAllText(path);
             NoteDataListWrapper noteDataListWrapper = JsonUtility.FromJson<NoteDataListWrapper>(json);
 
-            if (noteDataListWrapper != null && noteDataListWrapper.NoteDataList != null)
+            if (noteDataListWrapper?.NoteDataList != null)
             {
                 DisableAllFilledWindows();
+                
+                // Check if there are any loaded notes
+                bool hasLoadedNotes = noteDataListWrapper.NoteDataList.Count > 0;
+                
                 for (int i = 0; i < noteDataListWrapper.NoteDataList.Count; i++)
                 {
                     if (i < _filledNoteDataWindows.Count)
@@ -142,23 +134,32 @@ public class MainScreenNotesPresenter : MonoBehaviour
                         window.DeleteButtonClicked += ProcessFilledTravelsDataDeletion;
                         window.OpenNoteInfoClicked += ProcessOpenNoteClicked;
                         window.DataChanged += SaveNotes;
-                        _availableWindowIndexes.Remove(i);
                     }
                 }
                 
-                _notesView.DisableEmptyHistoryWindow();
-            }
-            
-            if (_availableWindowIndexes.Count >= _filledNoteDataWindows.Count)
-            {
-                _notesView.EnableEmptyHistoryWindow();
+                if (hasLoadedNotes)
+                {
+                    _notesView.DisableEmptyHistoryWindow();
+                    _notesView.UpdateNotesState(true);
+                }
+                
+                // Check if all windows are inactive
+                if (_filledNoteDataWindows.Count(w => w.IsActive) == 0)
+                {
+                    _notesView.EnableEmptyHistoryWindow();
+                    _notesView.UpdateNotesState(false);
+                }
             }
         }
-
+        else
+        {
+            // No notes file exists
+            _notesView.EnableEmptyHistoryWindow();
+            _notesView.UpdateNotesState(false);
+        }
     }
 
     private void ProcessOpenNoteClicked(FilledNoteInfo filledNoteInfo) => NoteInfoClicked?.Invoke(filledNoteInfo);
-
 }
 
 [Serializable]

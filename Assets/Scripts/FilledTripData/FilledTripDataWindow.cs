@@ -57,11 +57,6 @@ public class FilledTripDataWindow : MonoBehaviour
         _editButton.onClick.RemoveListener(OnEditButtonClicked);
     }
 
-    private void Update()
-    {
-        //Debug.Log(UniquePlaces.Count + gameObject.name);
-    }
-
     public void AddPlace(PlacesData place)
     {
         UniquePlaces.Add(place);
@@ -122,6 +117,8 @@ public class FilledTripDataWindow : MonoBehaviour
 
     public void SetBasicTripData(TripData tripData)
     {
+        Enable();
+        
         _currentTripData = tripData;
 
         SetTripName(tripData.Name);

@@ -1,4 +1,5 @@
 using System;
+using DG.Tweening;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -24,6 +25,23 @@ public class PrivacyPolicyView : MonoBehaviour
     private void OnEnable()
     {
         _backButton.onClick.AddListener(ProcessBackButton);
+    }
+    
+    public Tweener AnimateFadeIn(float duration, Ease ease)
+    {
+        gameObject.SetActive(true);
+    
+        CanvasGroup canvasGroup = GetComponent<CanvasGroup>();
+        canvasGroup.alpha = 0f;
+    
+        return canvasGroup.DOFade(1f, duration).SetEase(ease);
+    }
+
+    public Tweener AnimateFadeOut(float duration, Ease ease)
+    {
+        CanvasGroup canvasGroup = GetComponent<CanvasGroup>();
+    
+        return canvasGroup.DOFade(0f, duration).SetEase(ease);
     }
     
     public void Enable()

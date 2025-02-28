@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using DG.Tweening;
 
 public class CreateTravelScreen : MonoBehaviour
 {
@@ -67,9 +68,14 @@ public class CreateTravelScreen : MonoBehaviour
 
     private void OnSaveButtonClicked()
     {
-        TripData tripData = new TripData(_name, _description, _date);
-        SaveButtonClicked?.Invoke(tripData);
-        OnBackButtonClicked();
+        // Add save animation
+        DOTween.Sequence()
+            .Append(transform.DOShakePosition(0.3f, 5f, 10, 90))
+            .OnComplete(() => {
+                TripData tripData = new TripData(_name, _description, _date);
+                SaveButtonClicked?.Invoke(tripData);
+                OnBackButtonClicked();
+            });
     }
     
     private void ReturnDefaultTripDataValues()
@@ -84,15 +90,19 @@ public class CreateTravelScreen : MonoBehaviour
     
     private void ValidateInputs()
     {
-        bool allInputsValid = !string.IsNullOrEmpty(_name) && !string.IsNullOrEmpty(_description) && !string.IsNullOrEmpty(_date) ;
+        bool allInputsValid = !string.IsNullOrEmpty(_name) && !string.IsNullOrEmpty(_description) && !string.IsNullOrEmpty(_date);
 
         _view.SetSaveButtonInteractable(allInputsValid);
     }
 
     private void OnBackButtonClicked()
     {
-        BackButtonClicked?.Invoke();
-        ReturnDefaultTripDataValues();
-        _view.Disable();
+        DOTween.Sequence()
+            .Append(transform.DOShakeRotation(0.2f, 5f))
+            .OnComplete(() => {
+                BackButtonClicked?.Invoke();
+                ReturnDefaultTripDataValues();
+                _view.Disable();
+            });
     } 
 }

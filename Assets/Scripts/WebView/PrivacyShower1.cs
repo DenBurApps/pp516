@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -13,8 +13,9 @@ public class PrivacyShower : MonoBehaviour
 
     public void OpenPrivacy()
     {
-        string url = PlayerPrefs.GetString("Link");
-        _uni.Load(url);
+        //Подгружаем сохранённую ссылку в вебвью в зависимости от вашей системы сохранений
+        var link = LinkSaver.Link;
+        _uni.Load(link);
         _uni.Show();
     }
 }
